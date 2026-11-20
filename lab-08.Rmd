@@ -1,6 +1,6 @@
 ---
 title: "Lab 08 - Predicting rain"
-author: "INSERT NAME HERE"
+author: "Tanya Mary Abraham"
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -20,9 +20,51 @@ glimpse(email)
 
 1. What proportion of emails are spam? Calculate the proportion of spam separately for emails with and without the word “winner”.
 
+```{r}
+
+
+
+
+email 
+
+
+
+```
+
+
 2. Fit a logistic regression of `spam` on `winner` and write down the fitted model. Use `predict(..., type = "prob")` to find the predicted probability of spam for each group. Compare them with your previously calculated proportions.  
 
+```{r}
+
+email_fit <- logistic_reg() %>%
+  set_engine("glm") %>%
+  fit(spam ~ winner, data = email)
+
+tidy(email_fit)
+
+email_pred <- predict(email_fit, email, type = "prob") %>%
+  bind_cols(email)
+
+email_pred
+
+
+```
+
+
 3. How about fitting a logistic regression of `spam` on `winner` and `num_char`? Calculate the confusion matrix of the fitted logistic model on this new model, and compare with the confusion matrix result of the previous model, relying on `winner` only. Explain the differences on confusion matrix.
+
+```{r}
+email_fit <- logistic_reg() %>%
+  set_engine("glm") %>%
+  fit(spam ~ winner + num_char, data = email)
+
+tidy(email_fit)
+
+augment(email_fit, email) %>%
+  count(spam, .pred_class)
+  
+
+```
 
 **Hint:** `augment()` adds the predicted class (`.pred_class`) to the data.
 It labels an email as spam when its predicted probability is above 0.5.
@@ -66,21 +108,30 @@ weather %>%
 
 ```{r}
 
+weather_noNA <- weather %>%
+  filter(!is.na(RainTomorrow))
+
 ```
 
 2. Which cities are the ones with more rain days? To do this, let's analyze the `RainToday` variable. 
 
 ```{r}
-
+weather_noNA %>%
+  group_by(Location) %>%
+  filter(RainToday == "Yes") %>%
+  count(RainToday) %>%
+  arrange(desc(n))
 ```
+
+Cities with most rain days are Portland, Cairns, Walpole, Dartmoor, MountGambier and Norfolk Island. 
 
 # Exercise 2: Logistic regression
 
 We will focus our analysis on the city of `Portland`.
 Remove `eval=FALSE` from below once you have defined the object `weather_noNA`.
 
-```{r eval=FALSE}
-# remove eval=FALSE
+```{r}
+
 weather_Portland <- weather_noNA %>%
   filter(Location == "Portland")
 ```
@@ -88,6 +139,11 @@ weather_Portland <- weather_noNA %>%
 1. Try to predict `RainTomorrow` by fitting a linear regression using the variable `RainToday` and print the output using `tidy()`.
 
 ```{r}
+rain_fit <- logistic_reg() %>%
+  set_engine("glm") %>%
+  fit(RainTomorrow ~ RainToday, data = weather_Portland) 
+
+tidy(rain_fit)
 
 ```
 
@@ -96,6 +152,7 @@ weather_Portland <- weather_noNA %>%
 - Plot them using an appropriate visualization. What is peculiar about them?
 
 ```{r}
+
 
 ```
 
@@ -123,14 +180,18 @@ set.seed(111723)
 
 ```{r}
 
+rain_split <- initial_split(weather_Portland, prop = 0.80)
+
+train_data <- training(rain_split)
+test_data <- testing(rain_split)
 ```
 
 2. Refit the simple logistic regression using `RainToday` as predictor on this training data, using `tidymodels` recipes and workflows.
 
 - Start by the recipe. First initialize the recipe, then remove observations with missing values using `step_naomit()` and finally use `step_dummy` to convert categorical to dummy variables.
 
-```{r recipe1, eval=FALSE}
-# remove eval=FALSE
+```{r recipe1}
+
 weather_rec1 <- recipe(
   RainTomorrow ~ RainToday, 
   data = weather_Portland
@@ -141,21 +202,21 @@ weather_rec1 <- recipe(
 
 - Build your workflow combining model and recipe
 
-```{r workflow1, eval = FALSE}
-# remove eval=FALSE
-weather_mod1 <- ___ %>% 
-  set_engine(___)
-weather_wflow1 <- workflow() %>% # initiate workflow
-  ___(___) %>%                   # add model
-  ___(___)                       # add recipe
+```{r workflow1}
+
+weather_mod1 <- logistic_reg() %>% 
+  set_engine("glm")
+weather_wflow1 <- workflow() %>% 
+  add_model(weather_mod1) %>%                   
+  add_recipe(weather_rec1)                       
 ```
 
 - Now fit your model on the training data
 
-```{r fit1, eval = FALSE}
-# remove eval=FALSE
+```{r fit1}
+
 weather_fit1 <- weather_wflow1 %>% 
-  fit(data = ___)
+  fit(data = train_data)
 tidy(weather_fit1)
 ```
 
@@ -164,19 +225,30 @@ tidy(weather_fit1)
 
 - Start by the recipe. This will be a simple recipe, because we have not done many pre-processing steps, but do remove missing values and transform categorical variables into dummy variables:
 
-```{r recipe2, eval=FALSE}
-# remove eval=FALSE
+```{r recipe2}
+
 weather_rec2 <- recipe(
-  RainTomorrow ~ ___+___+___+___, # include your formula
+  RainTomorrow ~ MinTemp + MaxTemp + RainToday + Rainfall,
   data = weather_Portland
   ) %>%
-  step_naomit(___) %>%.          # exclude cases with missing values in all predictors
-  step_dummy(all_nominal(), ___) # exclude all outcomes
+  step_naomit(all_predictors()) %>%       
+  step_dummy(all_nominal(), -all_outcomes()) 
 ```
 
 - Save the model, workflow and finally, let's fit to the training data.
 
 ```{r}
+
+weather_mod2 <- logistic_reg() %>% 
+  set_engine("glm")
+weather_wflow2 <- workflow() %>% 
+  add_model(weather_mod2) %>%                   
+  add_recipe(weather_rec2)
+
+
+weather_fit2 <- weather_wflow2 %>% 
+  fit(data = train_data)
+tidy(weather_fit2)
 
 ```
 
